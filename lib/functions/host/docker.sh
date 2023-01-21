@@ -419,7 +419,7 @@ function docker_cli_launch() {
 	display_alert "-----------------Relaunching in Docker------------------------------------" "here comes the 🐳" "info"
 
 	local -i docker_build_result
-	if docker run -it "${DOCKER_ARGS[@]}" "${DOCKER_ARMBIAN_INITIAL_IMAGE_TAG}" /bin/bash "${DOCKER_ARMBIAN_TARGET_PATH}/compile.sh" "$@"; then
+	if docker run -i "${DOCKER_ARGS[@]}" "${DOCKER_ARMBIAN_INITIAL_IMAGE_TAG}" /bin/bash "${DOCKER_ARMBIAN_TARGET_PATH}/compile.sh" "$@"; then
 		docker_build_result=$? # capture exit code of test done in the line above.
 		display_alert "-------------Docker run finished------------------------------------------" "successfully" "info"
 	else
