@@ -3,6 +3,7 @@
 { pkgs ? import <nixpkgs> {} }:
   pkgs.mkShell {
     nativeBuildInputs = with pkgs.buildPackages; [
-      util-linux # Needed for uuidgen
+      util-linux # uuidgen
+      fakeroot # Building bsp-cli
     ];
 }
