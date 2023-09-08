@@ -3,9 +3,48 @@
 # SPDX-License-Identifier: GPL-2.0
 #
 # Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2023 Jacob Hrbek, kreyren@armbian.com
 #
 # This file is a part of the Armbian Build Framework
 # https://github.com/armbian/build/
+
+# Flash the image through fastboot on the device
+function fastboot_flash_image_to_device() {
+	case "$DANGER_ZONE" in
+		*"fastboot"*) printf "DANGER_ZONE: %s\n" "EXPERIMENTAL FASTBOOT FLASHING, good luck screwing up your system!" ;;
+		 *) exit_with_error "fastboot_flash_image_to_device_and_run_hooks was not verified to work and be reliable"
+	esac
+
+	[ -z "$FASTBOOT_SERIAL" ] || exit_with_error "Variable 'FASTBOOT_SERIAL' needs to be set to allow fastboot flashing"
+
+	# Inputs
+	bootloader_image="$1"
+	rootfs_archive="$2"
+
+	# Sanity-check for inputs
+	[ -z "$bootloader_image" ] || exit_with_error "Bootloader image has to be set to perform fastboot flashing"
+	[ -z "$rootfs_archive" ] || exit_with_error "Rootfs archive has to be set to perform fastboot flashing"
+
+	# Perform the flash
+	case "$BOARD" in
+		# Refer to https://wiki.sipeed.com/hardware/en/lichee/th1520/lpi4a/4_burn_image.html#Linux for details
+		"sipeed-licheepi-4a")
+			${FASTBOOT:-fastboot} -s "$FASTBOOT_SERIAL" flash rom "$bootloader_image"
+
+			${FASTBOOT:-fastboot} -s "$FASTBOOT_SERIAL" reboot
+
+			# FIXME-QA(Krey): Implement a check that runs once the device successfully reboots
+			sleep 10
+
+			${FASTBOOT:-fastboot} -s "$FASTBOOT_SERIAL" flash uboot "$bootloader_image"
+
+			${FASTBOOT:-fastboot} -s "$FASTBOOT_SERIAL" flash rootfs "$rootfs_archive"
+			;;
+		*)
+			exit_with_error "Board '$BOARD' is not implemented for fastboot flashing"
+	esac
+}
+
 
 # @TODO: make usable as a separate tool as well
 function write_image_to_device() {

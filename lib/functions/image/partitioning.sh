@@ -167,7 +167,16 @@ function prepare_partitions() {
 	else
 		# Create a script in a bracket shell, then pipe it to fdisk.
 		{
-			[[ "$IMAGE_PARTITION_TABLE" == "msdos" ]] && echo "label: dos" || echo "label: $IMAGE_PARTITION_TABLE"
+			case "$IMAGE_PARTITION_TABLE" in
+				"msdos")
+					printf "%s\n" "label: dos"
+					;;
+				"gpt")
+					printf "%s\n" "label: gpt"
+					;;
+				*)
+					exit_with_error "Variable 'IMAGE_PARTITION_TABLE' stores invalid value: $IMAGE_PARTITION_TABLE"
+			esac
 
 			local next=$OFFSET
 			if [[ -n "$biospart" ]]; then
@@ -246,7 +255,7 @@ function prepare_partitions() {
 			echo -n $CRYPTROOT_PASSPHRASE | cryptsetup luksOpen $rootdevice $ROOT_MAPPER -
 			display_alert "Root partition encryption complete." "" "ext"
 			# TODO: pass /dev/mapper to Docker
-			rootdevice=/dev/mapper/$ROOT_MAPPER # used by `mkfs` and `mount` commands
+			rootdevice="/dev/mapper/$ROOT_MAPPER" # used by `mkfs` and `mount` commands
 		fi
 
 		check_loop_device "$rootdevice"
@@ -267,7 +276,7 @@ function prepare_partitions() {
 
 		# create fstab (and crypttab) entry
 		local rootfs
-		if [[ $CRYPTROOT_ENABLE == yes ]]; then
+		if [[ "$CRYPTROOT_ENABLE" == yes ]]; then
 			# map the LUKS container partition via its UUID to be the 'cryptroot' device
 			echo "$ROOT_MAPPER UUID=${root_part_uuid} none luks" >> $SDCARD/etc/crypttab
 			rootfs=$rootdevice # used in fstab
@@ -325,35 +334,35 @@ function prepare_partitions() {
 	fi
 
 	# if we have boot.ini = remove armbianEnv.txt and add UUID there if enabled
-	if [[ -f $SDCARD/boot/boot.ini ]]; then
+	if [[ -f "$SDCARD/boot/boot.ini" ]]; then
 		display_alert "Found boot.ini" "${SDCARD}/boot/boot.ini" "debug"
-		sed -i -e "s/rootfstype \"ext4\"/rootfstype \"$ROOTFS_TYPE\"/" $SDCARD/boot/boot.ini
-		if [[ $CRYPTROOT_ENABLE == yes ]]; then
+		sed -i -e "s/rootfstype \"ext4\"/rootfstype \"$ROOTFS_TYPE\"/" "$SDCARD/boot/boot.ini"
+		if [[ "$CRYPTROOT_ENABLE" == yes ]]; then
 			rootpart="UUID=${root_part_uuid}"
-			sed -i 's/^setenv rootdev .*/setenv rootdev "\/dev\/mapper\/'$ROOT_MAPPER' cryptdevice='$rootpart':'$ROOT_MAPPER'"/' $SDCARD/boot/boot.ini
+			sed -i 's/^setenv rootdev .*/setenv rootdev "\/dev\/mapper\/'$ROOT_MAPPER' cryptdevice='$rootpart':'$ROOT_MAPPER'"/' "$SDCARD/boot/boot.ini"
 		else
-			sed -i 's/^setenv rootdev .*/setenv rootdev "'$rootfs'"/' $SDCARD/boot/boot.ini
+			sed -i 's/^setenv rootdev .*/setenv rootdev "'$rootfs'"/' "$SDCARD/boot/boot.ini"
 		fi
-		if [[ $LINUXFAMILY != meson64 ]]; then # @TODO: why only for meson64?
-			[[ -f $SDCARD/boot/armbianEnv.txt ]] && rm $SDCARD/boot/armbianEnv.txt
+		if [[ "$LINUXFAMILY" != meson64 ]]; then # @TODO: why only for meson64?
+			[[ -f "$SDCARD/boot/armbianEnv.txt" ]] && rm "$SDCARD/boot/armbianEnv.txt"
 		fi
 	fi
 
 	# if we have a headless device, set console to DEFAULT_CONSOLE
-	if [[ -n $DEFAULT_CONSOLE && -f $SDCARD/boot/armbianEnv.txt ]]; then
+	if [[ -n "$DEFAULT_CONSOLE" && -f "$SDCARD/boot/armbianEnv.txt" ]]; then
 		if grep -lq "^console=" $SDCARD/boot/armbianEnv.txt; then
-			sed -i "s/^console=.*/console=$DEFAULT_CONSOLE/" $SDCARD/boot/armbianEnv.txt
+			sed -i "s/^console=.*/console=$DEFAULT_CONSOLE/" "$SDCARD/boot/armbianEnv.txt"
 		else
-			echo "console=$DEFAULT_CONSOLE" >> $SDCARD/boot/armbianEnv.txt
+			echo "console=$DEFAULT_CONSOLE" >> "$SDCARD/boot/armbianEnv.txt"
 		fi
 	fi
 
 	# recompile .cmd to .scr if boot.cmd exists
-	if [[ -f "${SDCARD}/boot/boot.cmd" ]]; then
-		if [ -z ${BOOTSCRIPT_OUTPUT} ]; then
+	if [[ -f "$SDCARD/boot/boot.cmd" ]]; then
+		if [ -z "$BOOTSCRIPT_OUTPUT" ]; then
 			BOOTSCRIPT_OUTPUT=boot.scr
 		fi
-		case ${LINUXFAMILY} in
+		case "$LINUXFAMILY" in
 			x86)
 				:
 				display_alert "Compiling boot.scr" "boot/${BOOTSCRIPT_OUTPUT} x86" "debug"
@@ -368,13 +377,13 @@ function prepare_partitions() {
 	fi
 
 	# complement extlinux config if it exists; remove armbianEnv in this case.
-	if [[ -f $SDCARD/boot/extlinux/extlinux.conf ]]; then
-		echo "  append root=$rootfs $SRC_CMDLINE $MAIN_CMDLINE" >> $SDCARD/boot/extlinux/extlinux.conf
+	if [[ -f "$SDCARD/boot/extlinux/extlinux.conf" ]]; then
+		echo "  append root=$rootfs $SRC_CMDLINE $MAIN_CMDLINE" >> "$SDCARD/boot/extlinux/extlinux.conf"
 		display_alert "extlinux.conf exists" "removing armbianEnv.txt" "info"
-		[[ -f $SDCARD/boot/armbianEnv.txt ]] && run_host_command_logged rm -v $SDCARD/boot/armbianEnv.txt
+		[[ -f "$SDCARD/boot/armbianEnv.txt" ]] && run_host_command_logged rm -v "$SDCARD/boot/armbianEnv.txt"
 	fi
 
-	if [[ $SRC_EXTLINUX != yes && -f $SDCARD/boot/armbianEnv.txt ]]; then
+	if [[ "$SRC_EXTLINUX" != yes && -f "$SDCARD/boot/armbianEnv.txt" ]]; then
 		call_extension_method "image_specific_armbian_env_ready" <<- 'IMAGE_SPECIFIC_ARMBIAN_ENV_READY'
 			*during image build, armbianEnv.txt is ready for image-specific customization (not in BSP)*
 			You can write to `"${SDCARD}/boot/armbianEnv.txt"` here, it is guaranteed to exist.

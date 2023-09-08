@@ -30,7 +30,7 @@ SKIP_BOOTSPLASH="yes"
 
 KERNELDIR="linux-riscv"
 
-UEFI_GRUB_TARGET="riscv64-efi"
+# UEFI_GRUB_TARGET="riscv64-efi"
 
 # family_tweaks() {
 #

@@ -49,6 +49,10 @@ If you are unsure about the documentation then invoke `$ grep -r -A5 -B5 "BUILD_
 	- Values:
 		- serial: Output boot messages to serial console
 	- Default: `not set`
+- **FASTBOOT_SERIAL** ( string ): UUID of the fastboot device on which we are flashing
+	- Values:
+		- string: UUID from `fastboot devices`
+	- Default: `not set`
 - **MODULES** ( space-separated list of kernel modules ): appends modules to the kernel command line for **all** kernel branches
 - **MODULES_LEGACY** ( space-separated list of kernel modules ): appends modules to the kernel command line for **legacy** kernel
 - **MODULES_CURRENT** ( space-separated list of kernel modules ): appends modules to the kernel command line for **current** kernel

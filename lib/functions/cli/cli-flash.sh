@@ -15,7 +15,7 @@ function cli_flash_pre_run() {
 }
 
 function cli_flash_run() {
-	if [[ "x${BOARD}x" != "xx" ]]; then
+	if [ -n "$BOARD" ]; then
 		use_board="yes" prep_conf_main_minimal_ni < /dev/null # no stdin for this, so it bombs if tries to be interactive.
 	else
 		use_board="no" prep_conf_main_minimal_ni < /dev/null # no stdin for this, so it bombs if tries to be interactive.
@@ -25,21 +25,37 @@ function cli_flash_run() {
 	do_with_default_build cli_flash
 }
 
+# Flash the IMAGE to SDCARD and/or FASTBOOT_SENSOR device
 function cli_flash() {
-	declare image_file="${IMAGE:-""}"
-	# If not set, find the latest .img file in ${SRC}/output/images/
-	if [[ -z "${image_file}" ]]; then
-		# shellcheck disable=SC2012
-		image_file="$(ls -1t "${SRC}/output/images"/*"${BOARD^}_${RELEASE}_${BRANCH}"*.img | head -1)"
-		display_alert "cli_flash" "No image file specified. Using latest built image file found: ${image_file}" "info"
-	fi
-	if [[ ! -f "${image_file}" ]]; then
-		exit_with_error "No image file to flash."
-	fi
-	declare image_file_basename
-	image_file_basename="$(basename "${image_file}")"
-	display_alert "cli_flash" "Flashing image file: ${image_file_basename}" "info"
-	countdown_and_continue_if_not_aborted 3
+	image_file="$IMAGE"
 
-	write_image_to_device_and_run_hooks "${image_file}"
+	[ -n "$image_file" ] || {
+		display_alert "cli_flash" "No image file specified. Using latest built image file found: ${image_file}" "info"
+
+		# FIXME-QA(Krey): This is disgusting..
+		# shellcheck disable=SC2012 # FIXME(Krey): Rationale
+		image_file="$(ls -1t "$SRC/output/images"/*"${BOARD^}_$RELEASE_$BRANCH"*.img | head -1)"
+
+		# FIXME(Krey): Decypher the standard naming scheme
+		#image_file="Armbian_$VERSION_$BOARD_$RELEASE_$BRANCH_$CONFIG.img"
+	}
+
+	# Make sure that the image_file is a sane file
+	[ -f "$image_file" ] || exit_with_error "No image file to flash!"
+
+	image_file_basename="$(basename "$image_file")"
+
+	[ -z "$SDCARD" ] || {
+		display_alert "cli_flash" "Flashing image file on sdcard '$SDCARD': ${image_file_basename}" "info"
+		countdown_and_continue_if_not_aborted 3
+
+		write_image_to_device_and_run_hooks "$image_file"
+	}
+
+	[ -z "$FASTBOOT_SERIAL" ] || {
+		display_alert "cli_flash" "Flashing image file on fastboot device '$FASTBOOT_UUID': ${image_file_basename}" "info"
+		countdown_and_continue_if_not_aborted 3
+
+		fastboot_flash_image_to_device_and_run_hooks "$image_file"
+	}
 }

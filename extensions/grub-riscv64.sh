@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+
+# DMR(Krey): refactor this if i have time, it's terrible garbage
+
 # This runs *after* user_config. Don't change anything not coming from other variables or meant to be configured by the user.
+
 function extension_prepare_config__prepare_grub-riscv64() {
 	display_alert "Prepare config" "${EXTENSION}" "info"
 	# Extension configuration defaults.
